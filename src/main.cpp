@@ -1,85 +1,72 @@
-#include <GyverOLED.h>
-#include <MQ135.h>
+#include "gas_sensor.h"
+#include "MPU6050_DMP.h"
+#include "board_alarm.h"
+#include "heart_sensor.h"
+#include "display.h"
 
-#define PIN_BTN 2
-#define PIN_LED_ALARM 3
-#define PIN_BUZZ 5
+#define PIN_LED_INIT 5
 #define PIN_MQ135 A0
+#define PIN_DMP_ISR 3
 
-#define CO2_THRESHOLD 1000
-#define BUZZER_FREQ 1500
-#define BUZZER_ON 100
-#define BUZZER_OFF 100
-#define BUZZER_MUTE_TIME 10000
+GasSensor mq135(PIN_MQ135);
+MPU6050_DMP mpu(PIN_DMP_ISR);
+HeartSensor max30102;
+BoardAlarm boardAlarm;
+Display display;
 
-volatile bool isMuted = false;
-
-GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> oled;
-MQ135 mq135(PIN_MQ135);
-
-void btnIsr() { isMuted = true; }
+void blink(int times, int on, int off);
+void blinkInitLed();
 
 void setup() {
     Serial.begin(115200);
 
-    pinMode(PIN_BTN, INPUT_PULLUP);
-    pinMode(PIN_LED_ALARM, OUTPUT);
-    pinMode(PIN_BUZZ, OUTPUT);
-    attachInterrupt(digitalPinToInterrupt(PIN_BTN), btnIsr, FALLING);
+    pinMode(PIN_LED_INIT, OUTPUT);
+    blinkInitLed();
 
-    oled.init();
-    oled.clear();
-    oled.setScale(1);
-    mq135.calibrate();
+    if (!mpu.initialize()) {
+        display.printData("Ошибка инициализации MPU-6050");
+        while (1);
+    }
+
+    if (!max30102.initialize()) {
+        display.printData("Ошибка инициализации MAX30102");
+        while (1);
+    }
+
+    mq135.initialize();
 }
 
 void loop() {
-    static uint32_t tmrMQ;
-    static uint32_t tmrBuzzer;
-    static uint32_t tmrMute;
-    static bool buzzerState;
-    static bool isAirDirty = true;
-    static float co2;
+    bool mpuState = mpu.process();
+    bool mqState = mq135.process();
+    HeartSensor::HeartState maxState = max30102.process();
 
-    uint32_t now = millis();
+    static uint32_t lastAvgBpm = -1;
 
-    if (isMuted && ((now - tmrMute)  >= BUZZER_MUTE_TIME)) {
-        isMuted = false;
-        tmrMute = now;
+    DisplayState state;
+    state.mpuAlarm = mpuState;
+    state.gasAlarm = mqState;
+    state.defaultState = !(mqState || mpuState);
+
+    if (lastAvgBpm != max30102.getAvgBpm()) display.updateBpm(max30102.getAvgBpm());
+    display.updateAlarm(state);
+
+    if (!state.defaultState) boardAlarm.toogleAlarm();
+    else boardAlarm.disableAlarm();
+
+    lastAvgBpm = max30102.getAvgBpm();
+}
+
+void blink(int times, int on, int off) {
+    for (int i = 0; i < times; i++) {
+        digitalWrite(PIN_LED_INIT, HIGH);
+        delay(on);
+        digitalWrite(PIN_LED_INIT, LOW);
+        delay(off);
     }
-    
-    if ((now - tmrMQ) >= 250) {
-        tmrMQ = now;
-        co2 = mq135.readCO2();
-    }
+}
 
-    if (co2 >= CO2_THRESHOLD) {
-        if ((now - tmrBuzzer) >= (buzzerState ? BUZZER_ON : BUZZER_OFF)) {
-            tmrBuzzer = now;
-            buzzerState = !buzzerState;
-
-            if (!isMuted && buzzerState) tone(PIN_BUZZ, BUZZER_FREQ);
-            else noTone(PIN_BUZZ);
-
-            digitalWrite(PIN_LED_ALARM, buzzerState);
-        }
-
-        if (!isAirDirty) {
-            oled.clear();
-            oled.setCursor(32, 3);
-            oled.print("ГРЯЗНЫЙ ВОЗДУХ!");
-            isAirDirty = true;
-        }
-    } else {
-        noTone(PIN_BUZZ);
-        digitalWrite(PIN_LED_ALARM, LOW);
-        buzzerState = false;
-
-        if (isAirDirty) {
-            oled.clear();
-            oled.setCursor(32, 3);
-            oled.print("Все в норме");
-            isAirDirty = false;
-        }
-    }
+void blinkInitLed() {
+    blink(3, 500, 500);
+    blink(2, 100, 100);
 }
