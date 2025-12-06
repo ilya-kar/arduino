@@ -1,33 +1,33 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
+// подключение библиотек
 #include <GyverOLED.h>
 #include "heart_sensor.h"
+#include "config.h"
 
-struct DisplayState {
-    bool mpuAlarm = false;
-    bool gasAlarm = false;
-    bool defaultState = true;
-    HeartSensor::HeartState maxState = HeartSensor::HeartState::NO_FINGER;
-};
-
+// класс дисплея
 class Display {
 public:
     Display();
-    void updateAlarm(const DisplayState &state);
+    // метод обновления текста тревоги на дисплее
+    void updateAlarm(const AlarmState &state);
+    // метод обновления пульса
     void updateBpm(uint32_t bpm);
+    // метод печати текста
     void printData(const char *msg);
 
 private:
+    // методы печати сообщений на дисплее
+    void showAlarmMessage(const char* line1, const char* line2 = nullptr);
     void clearForAlarm();
     void printDefault();
     void printGasAlarm();
     void printMpuAlarm();
-    void printHeartHighAlarm();
-    void printHeartLowAlarm();
+    void printHeartAlarm();
 
     GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> oled;
-    DisplayState lastState;
+    AlarmState lastState = AlarmState::DEFAULT_ALARM;
 };
 
 #endif //DISPLAY_H

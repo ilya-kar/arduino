@@ -1,72 +1,87 @@
+// подключение библиотек
 #include "gas_sensor.h"
 #include "MPU6050_DMP.h"
 #include "board_alarm.h"
 #include "heart_sensor.h"
 #include "display.h"
 
-#define PIN_LED_INIT 5
-#define PIN_MQ135 A0
-#define PIN_DMP_ISR 3
+// инициализация глобальных переменных
+GasSensor mq135(PIN_MQ135); // датчик газа
+MPU6050_DMP mpu(PIN_DMP_ISR); // датчик с гироскопом и акселерометром
+HeartSensor max30102; // датчик пульса
+BoardAlarm boardAlarm; // сигнализация
+Display display; // дисплей
 
-GasSensor mq135(PIN_MQ135);
-MPU6050_DMP mpu(PIN_DMP_ISR);
-HeartSensor max30102;
-BoardAlarm boardAlarm;
-Display display;
+// переменная для учета последнего значения уд/мин
+uint32_t lastAvgBpm = 0;
 
-void blink(int times, int on, int off);
-void blinkInitLed();
+// функция мигания светодиодом
+void blink(int pin, int times, int on, int off);
 
+// функция инициализации
 void setup() {
-    Serial.begin(115200);
-
+    // светодиод инициализации
     pinMode(PIN_LED_INIT, OUTPUT);
-    blinkInitLed();
+    // мигаем 5 секунд с частотой 2 гц
+    blink(PIN_LED_INIT, 5, 500, 500);
 
+    // попытка инициализации MPU-6050
     if (!mpu.initialize()) {
+        // если неудачно - зацикливаем
         display.printData("Ошибка инициализации MPU-6050");
-        while (1);
+        while (true);
     }
 
+    // попытка инициализации MAX30102
     if (!max30102.initialize()) {
+        // если неудачно - зацикливаем
         display.printData("Ошибка инициализации MAX30102");
-        while (1);
+        while (true);
     }
 
+    // инициализация MQ-135
     mq135.initialize();
 }
 
+// функция основного цикла
 void loop() {
-    bool mpuState = mpu.process();
-    bool mqState = mq135.process();
-    HeartSensor::HeartState maxState = max30102.process();
+    // состояние по умолчанию - нет тревоги
+    AlarmState state = AlarmState::DEFAULT_ALARM;
 
-    static uint32_t lastAvgBpm = -1;
+    // если воздух нечистый
+    if (mq135.process()) state = AlarmState::GAS_ALARM;
+    // если критический пульс
+    if (max30102.process()) state = AlarmState::HEART_ALARM;
+    // если угол наклона головы критический
+    if (mpu.process()) state = AlarmState::MPU_ALARM;
 
-    DisplayState state;
-    state.mpuAlarm = mpuState;
-    state.gasAlarm = mqState;
-    state.defaultState = !(mqState || mpuState);
+    // получаем последнее значение пульса
+    uint32_t avgBpm = max30102.getAvgBpm();
+    // если не совпадает с предыдудщим
+    if (avgBpm != lastAvgBpm) {
+        // обновляем на дисплее
+        display.updateBpm(avgBpm);
+        lastAvgBpm = avgBpm;
+    }
 
-    if (lastAvgBpm != max30102.getAvgBpm()) display.updateBpm(max30102.getAvgBpm());
+    // обновляем состояние тревоги на дисплее в порядке приоритета
     display.updateAlarm(state);
 
-    if (!state.defaultState) boardAlarm.toogleAlarm();
+    // если есть тревога - включаем бортовую сигнализацию
+    if (state != AlarmState::DEFAULT_ALARM) boardAlarm.toogleAlarm();
+    // иначе выключаем
     else boardAlarm.disableAlarm();
-
-    lastAvgBpm = max30102.getAvgBpm();
 }
 
-void blink(int times, int on, int off) {
+// функция мигания светодиодом
+// pin - номера вывода, куда подключен светодиод
+// times - кол-во итераций мигания
+// on, off - время вкл/выкл светодиода соответственно, мс
+void blink(int pin, int times, int on, int off) {
     for (int i = 0; i < times; i++) {
-        digitalWrite(PIN_LED_INIT, HIGH);
+        digitalWrite(pin, HIGH);
         delay(on);
-        digitalWrite(PIN_LED_INIT, LOW);
+        digitalWrite(pin, LOW);
         delay(off);
     }
-}
-
-void blinkInitLed() {
-    blink(3, 500, 500);
-    blink(2, 100, 100);
 }
