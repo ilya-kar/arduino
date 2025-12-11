@@ -9,11 +9,11 @@
 // класс дисплея
 class Display {
 public:
-    Display();
+    void initialize();
     // метод обновления текста тревоги на дисплее
     void updateAlarm(const AlarmState &state);
     // метод обновления пульса
-    void updateBpm(uint32_t bpm);
+    void updateValues(uint32_t bpm, float pitch, float roll, uint32_t co2);
     // метод печати текста
     void printData(const char *msg);
 
@@ -28,6 +28,11 @@ private:
 
     GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> oled;
     AlarmState lastState = AlarmState::DEFAULT_ALARM;
+    uint32_t lastBpm = -1;
+    float lastPitch = -1;
+    float lastRoll = -1;
+    uint32_t lastCo2 = -1;
+    uint32_t tmrAngle = 0;
 };
 
 #endif //DISPLAY_H

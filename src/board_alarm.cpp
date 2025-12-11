@@ -6,8 +6,7 @@ static volatile bool btnPressed = false;
 // функция обработки прерывания
 static void btnIsr() { btnPressed = true; }
 
-// конструктор
-BoardAlarm::BoardAlarm() {
+void BoardAlarm::initialize() {
     // подтяжка резистором вывода под кнопку
     pinMode(PIN_BTN, INPUT_PULLUP);
     // настройка выводов под светодиоды
@@ -41,6 +40,12 @@ bool BoardAlarm::isAlarmToggleTime(uint32_t now) {
 // метод изменения состояния зуммера
 // now - текущее время работы микроконтроллера
 void BoardAlarm::changeMuteState(uint32_t now) {
+    if (!flag) {
+        flag = true;
+        btnPressed = false;
+        return;
+    }
+
     // фильтрация дребезга кнопки
     if (now - lastBtnTime > DEBOUNCE_MS) {
         // вкл/выкл зуммера

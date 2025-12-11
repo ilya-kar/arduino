@@ -7,7 +7,7 @@
 // класс бортовой тревоги
 class BoardAlarm {
 public:
-    BoardAlarm();
+    void initialize();
     // метод переключения тревоги
     void toogleAlarm();
     // метод отключения тревоги
@@ -24,6 +24,7 @@ private:
     bool buzzerState = false;
     bool alarmActive = false;
     bool isMuted = false;
+    bool flag = false;
 };
 
 #endif //BOARD_ALARM_H

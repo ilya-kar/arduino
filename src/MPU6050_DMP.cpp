@@ -22,8 +22,7 @@ bool MPU6050_DMP::initialize() {
 
     // инициализация MPU-6050
     mpu.initialize();
-    // отвечает ли датчик
-    if (!mpu.testConnection()) return false;
+
 
     // инициализация DMP (встроенный цифровой процессор ориентации)
     if (mpu.dmpInitialize() != 0) return false;
@@ -37,9 +36,6 @@ bool MPU6050_DMP::initialize() {
 
     // привязка обработчика прерывания готовности данных от DMP
     attachInterrupt(digitalPinToInterrupt(intPin), dmpIsr, RISING);
-
-    // получение размера пакета данных от DMP
-    packetSize = mpu.dmpGetFIFOPacketSize();
 
     return true;
 }
@@ -94,9 +90,9 @@ bool MPU6050_DMP::process() {
 //      false - порог угла наклона не превышен
 bool MPU6050_DMP::isDangerous(const float *ypr) {
     // вычисление абсолютного угла наклона вперед/назад в градусах
-    float pitch = abs(degrees(ypr[1]));
+    pitch = abs(degrees(ypr[1]));
     // вычисление абсолютного угла наклона влево/вправо в градусах
-    float roll  = abs(degrees(ypr[2]));
+    roll  = abs(degrees(ypr[2]));
     // вычисление превышения порога
     return (pitch >= PITCH_LIMIT) || (roll >= ROLL_LIMIT);
 }

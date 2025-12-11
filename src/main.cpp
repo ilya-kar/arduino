@@ -20,27 +20,33 @@ void blink(int pin, int times, int on, int off);
 
 // функция инициализации
 void setup() {
+    Serial.begin(115200);
+
     // светодиод инициализации
     pinMode(PIN_LED_INIT, OUTPUT);
-    // мигаем 5 секунд с частотой 2 гц
-    blink(PIN_LED_INIT, 5, 500, 500);
+    // мигаем 3 секунды с частотой 2 гц
+    blink(PIN_LED_INIT, 3, 500, 500);
+
+    display.initialize();
 
     // попытка инициализации MPU-6050
     if (!mpu.initialize()) {
         // если неудачно - зацикливаем
-        display.printData("Ошибка инициализации MPU-6050");
+        display.printData("Ошибка инициализации\nMPU-6050");
         while (true);
     }
 
     // попытка инициализации MAX30102
     if (!max30102.initialize()) {
         // если неудачно - зацикливаем
-        display.printData("Ошибка инициализации MAX30102");
+        display.printData("Ошибка инициализации\nMAX30102");
         while (true);
     }
 
     // инициализация MQ-135
     mq135.initialize();
+
+    boardAlarm.initialize();
 }
 
 // функция основного цикла
@@ -55,14 +61,13 @@ void loop() {
     // если угол наклона головы критический
     if (mpu.process()) state = AlarmState::MPU_ALARM;
 
-    // получаем последнее значение пульса
+   
     uint32_t avgBpm = max30102.getAvgBpm();
-    // если не совпадает с предыдудщим
-    if (avgBpm != lastAvgBpm) {
-        // обновляем на дисплее
-        display.updateBpm(avgBpm);
-        lastAvgBpm = avgBpm;
-    }
+    float pitch = mpu.getPitch();
+    float roll = mpu.getRoll();
+    uint32_t co2 = mq135.getCo2();
+
+    display.updateValues(avgBpm, pitch, roll, co2);
 
     // обновляем состояние тревоги на дисплее в порядке приоритета
     display.updateAlarm(state);

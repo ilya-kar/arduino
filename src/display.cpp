@@ -6,30 +6,22 @@ static const uint8_t icons_7x7[][7] PROGMEM {
     {0x0e, 0x11, 0x22, 0x44, 0x22, 0x11, 0x0e}
 };
 
-// битмап сердца
-static const uint8_t icons_8x8[][8] PROGMEM {
-    {0x1e, 0x3f, 0x7f, 0xfe, 0xfe, 0x7f, 0x3f, 0x1e}
-};
-
-// конструктор
-Display::Display() {
+void Display::initialize() {
     // инициализация дисплея
     oled.init();
     // очистка дисплея от мусора
     oled.clear();
     // печать текста по умолчанию
-    updateBpm(0);
+    updateValues(0, 0, 0, 0);
     printDefault();
 }
 
 // метод очистки дисплея под новую тревогу
 void Display::clearForAlarm() {
-    // установка шрифта в 3 раза больше обычного
-    oled.setScale(3);
     // очистка области дисплея под тревогу
     oled.clear(0, 32, 128, 64);
     // установка курсора в нужную позицию
-    oled.setCursor(0, 4);
+    oled.setCursor(0, 5);
 }
 
 // метод печати текста на дисплей
@@ -88,20 +80,51 @@ void Display::printHeartAlarm() {
     showAlarmMessage("Опасный пульс!");
 }
 
-// метод обновления значения пульса
-// bpm - значение уд/мин
-void Display::updateBpm(uint32_t bpm) {
-    // если он ноль
-    if (bpm == 0) {
-        // пульс неизвестен
-        oled.drawBitmap(48, 16, icons_7x7[1], 7, 7);
-        oled.print(" N/A      ");
-    } else {
-        // иначе создаем эффект бьющего сердца в момент обновления пульса
-        oled.drawBitmap(48, 16, icons_8x8[0], 8, 8);
-        oled.print(" ");
-        oled.print(bpm);
-        oled.print(" уд/мин    ");
-        oled.drawBitmap(48, 16, icons_7x7[0], 7, 7);
+void Display::updateValues(uint32_t bpm, float pitch, float roll, uint32_t co2) {
+    if (bpm > 0 && lastBpm == 0) {
+        oled.drawBitmap(0, 0, icons_7x7[0], 7, 7);
+    } else if (bpm == 0 && lastBpm != 0) {
+        oled.drawBitmap(0, 0, icons_7x7[1], 7, 7);
     }
+
+    oled.setCursor(8, 0);
+    if (bpm != lastBpm) {
+        if (bpm == 0) {
+            oled.print(" N/A        ");
+        } else {
+            oled.print(" ");
+            oled.print(bpm);
+            oled.print(" уд/мин     ");
+        }
+    }
+
+    if (millis() - tmrAngle > 100) {
+        oled.setCursor(0, 1);
+        if (pitch != lastPitch) {
+            oled.print("pitch: ");
+            oled.print(pitch);
+            oled.print(" градусов       ");
+        }
+
+        oled.setCursor(0, 2);
+        if (roll != lastRoll) {
+            oled.print("roll: ");
+            oled.print(roll);
+            oled.print(" градусов       "); 
+        }
+
+        tmrAngle = millis();
+    }
+
+    oled.setCursor(0, 3);
+    if (co2 != lastCo2) {
+        oled.print("co2 ppm: ");
+        oled.print(co2);
+        oled.print("    ");
+    }
+
+    lastBpm = bpm;
+    lastPitch = pitch;
+    lastRoll = roll;
+    lastCo2 = co2;
 }

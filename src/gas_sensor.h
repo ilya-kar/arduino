@@ -12,6 +12,7 @@ public:
     void initialize();
     // метод обработки данных с датчика
     bool process();
+    uint32_t getCo2() const { return co2; }
 
 private:
     // метод, проверяющий интвервал для считывания нового значения

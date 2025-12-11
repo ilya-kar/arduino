@@ -16,6 +16,8 @@ bool HeartSensor::initialize() {
     // обнуление массива значений
     for (int i = 0; i < RATE_SIZE; i++) rates[i] = 0;
 
+    max.setPulseAmplitudeRed(0x0A);
+
     return true;
 }
 
